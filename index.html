@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>COR Calendar</title>
+<meta name="theme-color" content="#7b1e33">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one column. Drop zone, editable class list, week/month calendar, then semester dates and export. PUP maroon and gold as the accent pair. */
+:root {
+  --bg: #f7f4f5;
+  --surface: #ffffff;
+  --ink: #26171c;
+  --muted: #6b5b61;
+  --line: #e3d9dc;
+  --accent: #7b1e33;
+  --accent-ink: #ffffff;
+  --gold: #c9962b;
+  --warn: #b4540a;
+  --warn-bg: #fdeede;
+  --s1: #2f6fb5; --s2: #2a8a6a; --s3: #b5651d; --s4: #7a4fb0;
+  --s5: #c2415f; --s6: #197d8c; --s7: #7d7a14; --s8: #5b6b7c;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171113; --surface: #221a1d; --ink: #f3eaed; --muted: #b6a5aa; --line: #3b2d32;
+    --accent: #e98aa1; --accent-ink: #2a0d16; --gold: #e0b04f; --warn: #f0a15a; --warn-bg: #3a2616;
+    --s1: #6fa6e6; --s2: #5cc29f; --s3: #e39a56; --s4: #b592e6;
+    --s5: #ee7f98; --s6: #5cc0cf; --s7: #c9c453; --s8: #9db0c2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171113; --surface: #221a1d; --ink: #f3eaed; --muted: #b6a5aa; --line: #3b2d32;
+  --accent: #e98aa1; --accent-ink: #2a0d16; --gold: #e0b04f; --warn: #f0a15a; --warn-bg: #3a2616;
+  --s1: #6fa6e6; --s2: #5cc29f; --s3: #e39a56; --s4: #b592e6;
+  --s5: #ee7f98; --s6: #5cc0cf; --s7: #c9c453; --s8: #9db0c2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+  padding-block: 0 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.band { height: 6px; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px))); background: linear-gradient(90deg, var(--accent) 0 78%, var(--gold) 78% 100%); }
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; padding-top: 28px; }
+h1 { font: 700 clamp(30px, 6vw, 44px)/1.05 var(--font-display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h2 { font: 600 20px/1.2 var(--font-display); margin: 0; letter-spacing: -0.01em; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 62ch; margin-top: 10px; }
+.sec { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hint { color: var(--muted); font-size: 13.5px; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+
+.drop { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; border: 2px dashed var(--line); border-radius: 10px; padding: 22px; background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over, .drop:focus-within { border-color: var(--accent); }
+.drop.over { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop strong { font: 600 17px var(--font-display); }
+.status { font-size: 14px; min-height: 22px; }
+.status.err { color: var(--warn); }
+.pill { display: inline-block; font: 500 12px var(--font-mono); letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; background: color-mix(in srgb, var(--gold) 22%, var(--surface)); color: var(--ink); }
+
+.btn { font: 600 14px var(--font-body); padding: 9px 16px; border-radius: 7px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+.btn:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, .drop:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.btn:hover { filter: brightness(1.08); }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 720px; }
+th { text-align: left; font: 500 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 10px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td input, td select, .field input, .field textarea { font: 14px var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; min-width: 0; }
+td input.code { width: 108px; font-family: var(--font-mono); font-size: 13px; }
+td input[type=time] { width: 112px; font-family: var(--font-mono); font-size: 13px; }
+td select { width: 84px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.x { background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+.x:hover { color: var(--warn); }
+.notes { display: flex; flex-direction: column; gap: 4px; }
+.note { font-size: 13.5px; color: var(--warn); background: var(--warn-bg); padding: 8px 12px; border-radius: 7px; }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 13.5px var(--font-body); padding: 7px 16px; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }
+.seg button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+.cal { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow-x: auto; }
+.wk { display: grid; min-width: 700px; }
+.wk .hd { padding: 10px 8px; text-align: center; font: 600 13px var(--font-display); border-bottom: 1px solid var(--line); background: var(--surface); }
+.wk .hd.today { color: var(--accent); box-shadow: inset 0 -3px 0 var(--gold); }
+.times { position: relative; border-right: 1px solid var(--line); }
+.times span { position: absolute; right: 6px; transform: translateY(-50%); font: 500 11px var(--font-mono); color: var(--muted); }
+.col { position: relative; border-left: 1px solid var(--line); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hh) - 1px), var(--line) calc(var(--hh) - 1px), var(--line) var(--hh)); }
+.blk { position: absolute; border-radius: 6px; padding: 4px 6px; overflow: hidden; font-size: 12px; line-height: 1.3; color: var(--ink); border-left: 4px solid var(--c); background: color-mix(in srgb, var(--c) 17%, var(--surface)); }
+.blk b { display: block; font: 600 12.5px var(--font-body); }
+.blk .t { font: 500 11px var(--font-mono); color: var(--muted); display: block; }
+.blk.clash { outline: 2px dashed var(--warn); outline-offset: -2px; }
+.mo-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); min-width: 700px; }
+.mo-head strong { font: 600 17px var(--font-display); }
+.mo { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-width: 700px; }
+.mo .dn { padding: 6px 8px; font: 500 12px var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.cell { min-height: 98px; padding: 4px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cell:nth-child(7n) { border-right: 0; }
+.cell .d { font: 500 12px var(--font-mono); color: var(--muted); padding: 0 3px; }
+.cell.out { background: color-mix(in srgb, var(--bg) 70%, var(--surface)); }
+.cell.out .d { opacity: .45; }
+.cell.today .d { color: var(--accent-ink); background: var(--accent); border-radius: 4px; align-self: flex-start; padding: 0 5px; }
+.cell .off { font-size: 11.5px; color: var(--muted); padding: 0 3px; font-style: italic; }
+.chip { font: 500 11.5px var(--font-body); border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 17%, var(--surface)); border-radius: 4px; padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field label, .lab { font: 500 12px var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.field textarea { min-height: 74px; resize: vertical; font-family: var(--font-mono); font-size: 13px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.links { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.links a { display: flex; flex-direction: column; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); text-decoration: none; border-left: 4px solid var(--c); min-width: 0; }
+.links a:hover { border-color: var(--accent); border-left-color: var(--c); }
+.links a b { font-size: 14px; }
+.links a span { font-size: 12.5px; color: var(--muted); }
+#icsBox { width: 100%; min-height: 140px; font: 12px var(--font-mono); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<script src="lib/pdf.min.js"></script>
+<script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="lib/pdf.worker.min.js";</script>
+
+</head>
+<body>
+<div class="band"></div>
+<main class="wrap">
+  <header>
+    <h1>COR Calendar</h1>
+    <p class="lede">Drop in your PUP Certificate of Registration. The classes become a weekly calendar and a file you can import into Google Calendar. The PDF is read inside your browser and is never uploaded.</p>
+  </header>
+
+  <section class="sec" aria-labelledby="h-drop">
+    <h2 id="h-drop">1. Your COR</h2>
+    <label class="drop" id="drop" for="file">
+      <strong>Drop the COR PDF here, or tap to choose it</strong>
+      <span class="hint">Works with the PDF downloaded from the student portal (selectable text, not a scan).</span>
+      <input type="file" id="file" accept="application/pdf,.pdf">
+    </label>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div class="notes" id="notes"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-classes">
+    <div class="sec-head">
+      <h2 id="h-classes">2. Check the classes</h2>
+      <span class="hint">Edit anything the reader got wrong. The calendar updates as you type.</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th></th><th>Code</th><th>Subject</th><th>Day</th><th>Start</th><th>End</th><th><span class="sr" style="position:absolute;left:-9999px">Remove</span></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="row"><button class="btn ghost small" id="add" type="button">Add a meeting</button></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-cal">
+    <div class="sec-head">
+      <h2 id="h-cal">3. Your calendar</h2>
+      <div class="seg" role="group" aria-label="Calendar view">
+        <button type="button" id="vWeek" aria-pressed="true">Week</button>
+        <button type="button" id="vMonth" aria-pressed="false">Month</button>
+      </div>
+    </div>
+    <div class="note" id="clash" hidden></div>
+    <div class="cal" id="cal"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-exp">
+    <h2 id="h-exp">4. Semester dates and export</h2>
+    <div class="settings">
+      <div class="field"><label for="start">First day of classes</label><input type="date" id="start"></div>
+      <div class="field"><label for="end">Last day of classes</label><input type="date" id="end"></div>
+      <div class="field"><label for="skip">No-class dates (holidays, suspensions)</label><textarea id="skip" placeholder="2026-11-01&#10;2026-11-30"></textarea></div>
+    </div>
+    <label class="check"><input type="checkbox" id="alarm"> Remind me 15 minutes before each class</label>
+    <div class="row">
+      <button class="btn" id="dl" type="button">Download .ics</button>
+      <button class="btn ghost" id="copy" type="button">Copy .ics text</button>
+    </div>
+    <p class="hint" id="exportHint">Import the .ics file in Google Calendar under Settings, then Import &amp; export. Every class repeats weekly from the first day to the last day, skipping the no-class dates.</p>
+    <div class="status" id="exStatus" role="status" aria-live="polite"></div>
+    <textarea id="icsBox" readonly hidden aria-label="Calendar file text"></textarea>
+    <div class="lab">Or add one class at a time to Google Calendar</div>
+    <div class="links" id="links"></div>
+    <p class="hint">These links repeat each class weekly until the last day but do not skip the no-class dates. Use the file for that.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var DAYIDX = { M: 0, T: 1, W: 2, TH: 3, F: 4, S: 5, SUN: 6, SU: 6, MON: 0, TUE: 1, WED: 2, THU: 3, FRI: 4, SAT: 5 };
+  var HH = 54; // pixels per hour in the week view
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var toMin = function (t) { var p = String(t || "0:0").split(":"); return (+p[0]) * 60 + (+p[1] || 0); };
+  var fmt12 = function (m) { var h = Math.floor(m / 60), mm = m % 60, ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return h + ":" + pad(mm) + " " + ap; };
+  var fmtRange = function (a, b) {
+    var x = fmt12(a), y = fmt12(b);
+    return x.slice(-2) === y.slice(-2) ? x.slice(0, -3) + " – " + y : x + " – " + y;
+  };
+  var iso = function (d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); };
+  var parseIso = function (s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+  var wd = function (d) { return (d.getDay() + 6) % 7; };
+  var addDays = function (d, n) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); return x; };
+
+  /* ---------- state ---------- */
+  var uid = 0;
+  var state = { meetings: [], notes: [], term: "", example: true, view: "week", month: null };
+
+  function mk(code, title, section, day, s, e) { return { id: ++uid, code: code, title: title, section: section || "", day: day, start: s, end: e }; }
+  function loadExample() {
+    var m = [
+      ["CMPE 102", "Programming Logic and Design", [[3, "07:30", "10:30"], [4, "15:00", "18:00"]]],
+      ["CMPE 105", "Computer Hardware Fundamentals", [[3, "16:30", "19:30"], [0, "18:00", "21:00"]]],
+      ["CPET 102", "Web Technology and Programming", [[3, "13:30", "15:30"], [1, "18:00", "21:00"]]],
+      ["CWTS 001", "Civic Welfare Training Service 1", [[6, "08:00", "12:00"], [6, "13:00", "18:00"]]],
+      ["ENSC 013", "Engineering Drawing", [[0, "15:00", "18:00"], [1, "15:00", "18:00"]]],
+      ["MATH 003", "Basic Calculus", [[5, "14:00", "18:00"]]],
+      ["PATHFIT 1", "Physical Activity Towards Health and Fitness 1", [[1, "11:00", "13:00"]]],
+      ["PHYS 001", "General Physics", [[5, "07:30", "10:30"], [5, "10:30", "13:30"]]]
+    ];
+    state.meetings = [];
+    m.forEach(function (r) { r[2].forEach(function (x) { state.meetings.push(mk(r[0], r[1], "", x[0], x[1], x[2])); }); });
+    state.example = true; state.notes = []; state.term = "";
+  }
+
+  /* ---------- PDF parsing ---------- */
+  function parseDays(tok) {
+    var out = [];
+    var parts = tok.split("/");
+    for (var k = 0; k < parts.length; k++) {
+      var p = parts[k], i = 0;
+      while (i < p.length) {
+        var m = /^(SUN|MON|TUE|WED|THU|FRI|SAT|TH|SU|M|T|W|F|S)/.exec(p.slice(i));
+        if (!m) return null;
+        out.push(DAYIDX[m[1]]); i += m[1].length;
+      }
+    }
+    var seen = {}; return out.filter(function (d) { return seen[d] ? false : (seen[d] = true); });
+  }
+  var SCHED = /(?:^|\s)([A-Z]{1,4}(?:\/[A-Z]{1,4})*)\s+(\d{1,2}):(\d{2})(?::\d{2})?\s*-\s*(\d{1,2}):(\d{2})(?::\d{2})?(?:\s+([A-Z]{2,5}))?/g;
+  var SUBJ = /^([A-Z]+\s?\d+[A-Z]?)\s+(.+?)\s+(\d*[A-Z]+(?:\s\d+-\d+|\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/;
+
+  async function readLines(buf) {
+    var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    var lines = [];
+    for (var p = 1; p <= pdf.numPages; p++) {
+      var page = await pdf.getPage(p);
+      var tc = await page.getTextContent();
+      var items = tc.items.filter(function (i) { return i.str && i.str.trim(); }).map(function (i) { return { s: i.str, x: i.transform[4], y: -i.transform[5] + p * 10000 }; });
+      items.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+      var cur = null;
+      items.forEach(function (it) {
+        if (cur && Math.abs(it.y - cur.y) <= 3) { cur.items.push(it); cur.y = it.y; }
+        else { cur = { y: it.y, items: [it] }; lines.push(cur); }
+      });
+    }
+    lines.forEach(function (l) {
+      l.items.sort(function (a, b) { return a.x - b.x; });
+      l.text = l.items.map(function (i) { return i.s; }).join(" ").replace(/\s+/g, " ").trim();
+    });
+    return lines;
+  }
+
+  function parseCor(lines) {
+    var subjects = [], scheds = [], all = lines.map(function (l) { return l.text; }).join("\n");
+    lines.forEach(function (l) {
+      SCHED.lastIndex = 0;
+      var first = -1, m;
+      while ((m = SCHED.exec(l.text))) {
+        var days = parseDays(m[1]);
+        if (!days || !days.length) continue;
+        if (first < 0) first = m.index;
+        scheds.push({ y: l.y, days: days, token: m[1], start: pad(+m[2]) + ":" + m[3], end: pad(+m[4]) + ":" + m[5] });
+      }
+      var subjPart = (first >= 0 ? l.text.slice(0, first) : l.text).trim();
+      var s = SUBJ.exec(subjPart);
+      if (s) subjects.push({ y: l.y, code: s[1].replace(/\s+/g, " "), title: s[2], section: s[3], meetings: [] });
+    });
+    if (!subjects.length) return null;
+    scheds.forEach(function (sc) {
+      var best = subjects[0], bd = Infinity;
+      subjects.forEach(function (s) { var d = Math.abs(s.y - sc.y); if (d < bd) { bd = d; best = s; } });
+      best.meetings.push(sc);
+    });
+    var meetings = [], notes = [];
+    subjects.forEach(function (s) {
+      s.meetings.forEach(function (sc) {
+        sc.days.forEach(function (d) { meetings.push(mk(s.code, s.title, s.section, d, sc.start, sc.end)); });
+        if (sc.token.indexOf("/") >= 0 || sc.days.length > 1) notes.push(s.code + ": “" + sc.token + "” was read as " + sc.days.map(function (d) { return DAYS[d]; }).join(" and ") + ". Check that this is right.");
+      });
+      if (!s.meetings.length) notes.push(s.code + " has no meeting time on the COR (online or to be announced), so it is not on the calendar.");
+    });
+    var ay = /A\.Y\.:\s*(\d{2})(\d{2})/.exec(all), tm = /TERM:\s*([A-Za-z]+ Semester|Summer|Midyear)/i.exec(all);
+    var term = (ay ? "A.Y. 20" + ay[1] + "–20" + ay[2] : "") + (tm ? (ay ? " · " : "") + tm[1] : "");
+    return { meetings: meetings, notes: notes, term: term, count: subjects.length };
+  }
+
+  async function handleFile(f) {
+    var st = $("status"); st.className = "status";
+    if (!f) return;
+    if (!/pdf$/i.test(f.name) && f.type !== "application/pdf") { st.className = "status err"; st.textContent = "That is not a PDF. Choose the COR file you downloaded."; return; }
+    if (typeof pdfjsLib === "undefined") { st.className = "status err"; st.textContent = "The PDF reader did not load. Check your connection and reload the page."; return; }
+    st.textContent = "Reading " + f.name + "…";
+    try {
+      var buf = await f.arrayBuffer();
+      var lines = await readLines(buf);
+      if (!lines.length) { st.className = "status err"; st.textContent = "This PDF has no selectable text. It may be a scan or a printed copy saved as PDF. Download the COR again from the portal."; return; }
+      var res = parseCor(lines);
+      if (!res || !res.meetings.length) { st.className = "status err"; st.textContent = "Could not find a subject table with class times. Is this the Certificate of Registration?"; return; }
+      state.meetings = res.meetings; state.notes = res.notes; state.term = res.term; state.example = false;
+      st.textContent = "Found " + res.count + " subjects and " + res.meetings.length + " weekly meetings" + (res.term ? " for " + res.term : "") + ".";
+      renderAll();
+    } catch (e) {
+      st.className = "status err"; st.textContent = "Could not read that PDF (" + (e && e.message ? e.message : "unknown error") + ").";
+    }
+  }
+
+  /* ---------- colors ---------- */
+  function colorMap() {
+    var map = {}, n = 0;
+    state.meetings.forEach(function (m) { if (!(m.code in map)) map[m.code] = "var(--s" + ((n++ % 8) + 1) + ")"; });
+    return map;
+  }
+
+  /* ---------- table ---------- */
+  function renderRows() {
+    var cm = colorMap();
+    var h = "";
+    state.meetings.forEach(function (m) {
+      h += '<tr data-id="' + m.id + '"><td><span class="dot" style="background:' + cm[m.code] + '"></span></td>' +
+        '<td><input class="code" data-f="code" value="' + esc(m.code) + '" aria-label="Subject code"></td>' +
+        '<td><input data-f="title" value="' + esc(m.title) + '" aria-label="Subject title"></td>' +
+        '<td><select data-f="day" aria-label="Day">' + DAYS.map(function (d, i) { return '<option value="' + i + '"' + (i === m.day ? " selected" : "") + ">" + d + "</option>"; }).join("") + "</select></td>" +
+        '<td><input type="time" data-f="start" value="' + esc(m.start) + '" aria-label="Start time"></td>' +
+        '<td><input type="time" data-f="end" value="' + esc(m.end) + '" aria-label="End time"></td>' +
+        '<td><button class="x" type="button" data-del="1" aria-label="Remove this meeting">×</button></td></tr>';
+    });
+    $("rows").innerHTML = h || '<tr><td colspan="7" class="hint" style="padding:16px">No meetings yet. Drop a COR above or add one.</td></tr>';
+  }
+
+  /* ---------- calendar ---------- */
+  function validMeetings() { return state.meetings.filter(function (m) { return m.start && m.end && toMin(m.end) > toMin(m.start); }); }
+
+  function layoutDay(list) {
+    var res = [], cluster = [], cEnd = -1;
+    function flush() {
+      var lanes = [];
+      cluster.forEach(function (b) {
+        var l = lanes.findIndex(function (e) { return e <= b.s; });
+        if (l < 0) { l = lanes.length; lanes.push(0); }
+        lanes[l] = b.e; b.lane = l;
+      });
+      cluster.forEach(function (b) { b.lanes = lanes.length; });
+      res = res.concat(cluster); cluster = [];
+    }
+    list.forEach(function (b) {
+      if (cluster.length && b.s >= cEnd) flush();
+      cEnd = cluster.length ? Math.max(cEnd, b.e) : b.e;
+      cluster.push(b);
+    });
+    flush();
+    return res;
+  }
+
+  function renderWeek(cm) {
+    var ms = validMeetings();
+    if (!ms.length) return '<div class="hint" style="padding:20px">Nothing to show yet.</div>';
+    var minS = Math.min.apply(null, ms.map(function (m) { return toMin(m.start); }));
+    var maxE = Math.max.apply(null, ms.map(function (m) { return toMin(m.end); }));
+    var h0 = Math.max(0, Math.floor(minS / 60) - 1), h1 = Math.min(24, Math.ceil(maxE / 60) + 1);
+    var hasSun = ms.some(function (m) { return m.day === 6; });
+    var nd = hasSun ? 7 : 6;
+    var todayIdx = wd(new Date());
+    var out = '<div class="wk" style="grid-template-columns:52px repeat(' + nd + ',minmax(104px,1fr));--hh:' + HH + 'px">';
+    out += '<div class="hd"></div>';
+    for (var d = 0; d < nd; d++) out += '<div class="hd' + (d === todayIdx ? " today" : "") + '">' + DAYS[d] + "</div>";
+    out += '<div class="times" style="height:' + ((h1 - h0) * HH) + 'px">';
+    for (var h = h0; h <= h1; h++) { if (h === h0) continue; out += '<span style="top:' + ((h - h0) * HH) + 'px">' + fmt12(h * 60).replace(":00", "") + "</span>"; }
+    out += "</div>";
+    for (d = 0; d < nd; d++) {
+      var list = ms.filter(function (m) { return m.day === d; }).map(function (m) { return { m: m, s: toMin(m.start), e: toMin(m.end) }; }).sort(function (a, b) { return a.s - b.s || a.e - b.e; });
+      list = layoutDay(list);
+      out += '<div class="col" style="height:' + ((h1 - h0) * HH) + 'px">';
+      list.forEach(function (b) {
+        var top = (b.s / 60 - h0) * HH, ht = (b.e - b.s) / 60 * HH - 2, w = 100 / b.lanes;
+        out += '<div class="blk' + (b.lanes > 1 ? " clash" : "") + '" style="--c:' + cm[b.m.code] + ";top:" + top + "px;height:" + ht + "px;left:calc(" + (b.lane * w) + "% + 2px);width:calc(" + w + '% - 4px)" title="' + esc(b.m.code + " " + b.m.title) + '"><b>' + esc(b.m.code) + '</b><span class="t">' + fmtRange(b.s, b.e) + "</span>" + (ht > 78 ? esc(b.m.title) : "") + "</div>";
+      });
+      out += "</div>";
+    }
+    return out + "</div>";
+  }
+
+  function settings() {
+    var s = parseIso($("start").value), e = parseIso($("end").value);
+    var skip = {}; ($("skip").value.match(/\d{4}-\d{2}-\d{2}/g) || []).forEach(function (x) { skip[x] = true; });
+    return { start: s, end: e, skip: skip };
+  }
+
+  function renderMonth(cm) {
+    var st = settings();
+    var ms = validMeetings();
+    var mo = state.month || (state.month = { y: (st.start || new Date()).getFullYear(), m: (st.start || new Date()).getMonth() });
+    var first = new Date(mo.y, mo.m, 1);
+    var gridStart = addDays(first, -wd(first));
+    var title = first.toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+    var out = '<div class="mo-head"><button class="btn ghost small" type="button" data-nav="-1" aria-label="Previous month">‹ Prev</button><strong>' + title + '</strong><button class="btn ghost small" type="button" data-nav="1" aria-label="Next month">Next ›</button></div><div class="mo">';
+    DAYS.forEach(function (d) { out += '<div class="dn">' + d + "</div>"; });
+    var todayIso = iso(new Date());
+    for (var i = 0; i < 42; i++) {
+      var d = addDays(gridStart, i);
+      if (i >= 35 && d.getMonth() !== mo.m) break;
+      var k = iso(d), inMonth = d.getMonth() === mo.m;
+      var inRange = st.start && st.end && d >= st.start && d <= st.end;
+      var off = st.skip[k];
+      var list = (inRange && !off) ? ms.filter(function (m) { return m.day === wd(d); }).sort(function (a, b) { return toMin(a.start) - toMin(b.start); }) : [];
+      out += '<div class="cell' + (inMonth ? "" : " out") + (k === todayIso ? " today" : "") + '"><span class="d">' + d.getDate() + "</span>";
+      if (off && inRange && ms.some(function (m) { return m.day === wd(d); })) out += '<span class="off">No class</span>';
+      list.forEach(function (m) { out += '<div class="chip" style="--c:' + cm[m.code] + '" title="' + esc(m.code + " " + m.title + " " + fmtRange(toMin(m.start), toMin(m.end))) + '">' + esc(m.code) + " · " + fmt12(toMin(m.start)).replace(":00", "") + "</div>"; });
+      out += "</div>";
+    }
+    return out + "</div>";
+  }
+
+  function clashText() {
+    var ms = validMeetings(), pairs = [];
+    for (var d = 0; d < 7; d++) {
+      var l = ms.filter(function (m) { return m.day === d; });
+      for (var i = 0; i < l.length; i++) for (var j = i + 1; j < l.length; j++) {
+        if (toMin(l[i].start) < toMin(l[j].end) && toMin(l[j].start) < toMin(l[i].end)) pairs.push(l[i].code + " and " + l[j].code + " overlap on " + DAYS[d]);
+      }
+    }
+    return pairs.length ? pairs.join(". ") + "." : "";
+  }
+
+  function renderCalendar() {
+    var cm = colorMap();
+    $("cal").innerHTML = state.view === "week" ? renderWeek(cm) : renderMonth(cm);
+    var c = clashText(), cb = $("clash");
+    cb.hidden = !c; cb.textContent = c ? "Schedule conflict: " + c : "";
+    var seen = {}, lg = "";
+    state.meetings.forEach(function (m) { if (!seen[m.code]) { seen[m.code] = 1; lg += '<span><i class="dot" style="background:' + cm[m.code] + '"></i>' + esc(m.code) + " " + esc(m.title) + "</span>"; } });
+    $("legend").innerHTML = lg;
+    $("vWeek").setAttribute("aria-pressed", state.view === "week");
+    $("vMonth").setAttribute("aria-pressed", state.view === "month");
+  }
+
+  /* ---------- export ---------- */
+  function firstDate(start, day) { var d = new Date(start.getTime()); var diff = (day - wd(d) + 7) % 7; return addDays(d, diff); }
+  var ymd = function (d) { return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); };
+  var hms = function (t) { var m = toMin(t); return pad(Math.floor(m / 60)) + pad(m % 60) + "00"; };
+  var icsEsc = function (s) { return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); };
+  function fold(line) { var out = [], s = line; while (s.length > 72) { out.push(s.slice(0, 72)); s = " " + s.slice(72); } out.push(s); return out.join("\r\n"); }
+
+  function eventsInRange() {
+    var st = settings();
+    if (!st.start || !st.end || st.end < st.start) return null;
+    var list = [];
+    validMeetings().forEach(function (m) {
+      var f = firstDate(st.start, m.day);
+      if (f > st.end) return;
+      list.push({ m: m, first: f });
+    });
+    return { st: st, list: list };
+  }
+
+  function buildIcs() {
+    var ev = eventsInRange();
+    if (!ev || !ev.list.length) return "";
+    var st = ev.st, L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//COR Calendar//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Class Schedule", "X-WR-TIMEZONE:Asia/Manila",
+      "BEGIN:VTIMEZONE", "TZID:Asia/Manila", "BEGIN:STANDARD", "DTSTART:19700101T000000", "TZOFFSETFROM:+0800", "TZOFFSETTO:+0800", "TZNAME:PST", "END:STANDARD", "END:VTIMEZONE"];
+    var stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    var alarm = $("alarm").checked;
+    ev.list.forEach(function (x, i) {
+      var m = x.m, ds = ymd(x.first);
+      L.push("BEGIN:VEVENT");
+      L.push("UID:cor-" + ds + "-" + i + "-" + String(m.code).replace(/\W/g, "") + "@cor-calendar");
+      L.push("DTSTAMP:" + stamp);
+      L.push("DTSTART;TZID=Asia/Manila:" + ds + "T" + hms(m.start));
+      L.push("DTEND;TZID=Asia/Manila:" + ds + "T" + hms(m.end));
+      L.push("RRULE:FREQ=WEEKLY;UNTIL=" + ymd(st.end) + "T155959Z");
+      var ex = [];
+      for (var d = x.first; d <= st.end; d = addDays(d, 7)) if (st.skip[iso(d)]) ex.push(ymd(d) + "T" + hms(m.start));
+      if (ex.length) L.push("EXDATE;TZID=Asia/Manila:" + ex.join(","));
+      L.push("SUMMARY:" + icsEsc(m.code + " " + m.title));
+      if (m.section) L.push("DESCRIPTION:" + icsEsc("Section " + m.section));
+      if (alarm) { L.push("BEGIN:VALARM", "TRIGGER:-PT15M", "ACTION:DISPLAY", "DESCRIPTION:" + icsEsc(m.code + " starts in 15 minutes"), "END:VALARM"); }
+      L.push("END:VEVENT");
+    });
+    L.push("END:VCALENDAR");
+    return L.map(fold).join("\r\n") + "\r\n";
+  }
+
+  function renderLinks() {
+    var ev = eventsInRange(), cm = colorMap(), h = "";
+    if (ev) ev.list.forEach(function (x) {
+      var m = x.m, ds = ymd(x.first);
+      var url = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(m.code + " " + m.title) +
+        "&dates=" + ds + "T" + hms(m.start) + "/" + ds + "T" + hms(m.end) + "&ctz=Asia%2FManila" +
+        "&recur=" + encodeURIComponent("RRULE:FREQ=WEEKLY;UNTIL=" + ymd(ev.st.end) + "T155959Z") + (m.section ? "&details=" + encodeURIComponent("Section " + m.section) : "");
+      h += '<a href="' + url + '" target="_blank" rel="noopener" style="--c:' + cm[m.code] + '"><b>' + esc(m.code) + " · " + DAYS[m.day] + '</b><span>' + fmtRange(toMin(m.start), toMin(m.end)) + " · " + esc(m.title) + "</span></a>";
+    });
+    $("links").innerHTML = h || '<span class="hint">Set valid semester dates to see the links.</span>';
+  }
+
+  /* minimal zip (store, one file) so the .ics can leave a sandboxed viewer */
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function makeZip(name, text) {
+    var enc = new TextEncoder(), data = enc.encode(text), nm = enc.encode(name), crc = crc32(data);
+    var lh = 30 + nm.length, cd = 46 + nm.length, buf = new Uint8Array(lh + data.length + cd + 22), v = new DataView(buf.buffer), o = 0;
+    function w16(x) { v.setUint16(o, x, true); o += 2; } function w32(x) { v.setUint32(o, x, true); o += 4; }
+    w32(0x04034b50); w16(20); w16(0x0800); w16(0); w16(0); w16(0x21); w32(crc); w32(data.length); w32(data.length); w16(nm.length); w16(0);
+    buf.set(nm, o); o += nm.length; buf.set(data, o); o += data.length;
+    var cdStart = o;
+    w32(0x02014b50); w16(20); w16(20); w16(0x0800); w16(0); w16(0); w16(0x21); w32(crc); w32(data.length); w32(data.length); w16(nm.length); w16(0); w16(0); w16(0); w16(0); w32(0); w32(0);
+    buf.set(nm, o); o += nm.length;
+    w32(0x06054b50); w16(0); w16(0); w16(1); w16(1); w32(cd); w32(cdStart); w16(0);
+    return buf;
+  }
+
+  function say(msg, err) { var s = $("exStatus"); s.className = "status" + (err ? " err" : ""); s.textContent = msg; }
+
+  async function saveIcs() {
+    var text = buildIcs();
+    if (!text) { say("No classes fall inside those semester dates. Check the first and last day.", true); return; }
+    var dl = null;
+    try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch (e) { dl = null; }
+    if (dl) {
+      try { await dl.save({ filename: "class-schedule.zip", data: makeZip("class-schedule.ics", text) }); say("Saved class-schedule.zip. Unzip it, then import class-schedule.ics into Google Calendar."); }
+      catch (e) { say(e && e.code === "declined" ? "Save cancelled." : "Saving is not available in this view. Use Copy .ics text or the Google Calendar links below.", !(e && e.code === "declined")); }
+      return;
+    }
+    try {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type: "text/calendar" })); a.download = "class-schedule.ics";
+      document.body.appendChild(a); a.click(); a.remove();
+      say("Downloaded class-schedule.ics. Import it in Google Calendar.");
+    } catch (e) { say("Download did not start. Use Copy .ics text instead.", true); }
+  }
+
+  async function copyIcs() {
+    var text = buildIcs();
+    if (!text) { say("No classes fall inside those semester dates. Check the first and last day.", true); return; }
+    var box = $("icsBox"); box.value = text;
+    try { await navigator.clipboard.writeText(text); say("Copied. Paste it into a text file and save it as class-schedule.ics."); box.hidden = true; }
+    catch (e) { box.hidden = false; box.focus(); box.select(); say("Copy was blocked. The text is selected below: copy it and save it as class-schedule.ics.", true); }
+  }
+
+  /* ---------- wiring ---------- */
+  function renderAll() {
+    renderRows(); renderCalendar(); renderLinks();
+    $("notes").innerHTML = state.notes.map(function (n) { return '<div class="note">' + esc(n) + "</div>"; }).join("");
+    if (state.example && !$("status").textContent) { $("status").innerHTML = '<span class="pill">Example</span> This is a sample schedule. Drop your COR to replace it.'; }
+  }
+  function refresh() { renderCalendar(); renderLinks(); }
+
+  function init() {
+    var t = new Date(), mon = addDays(new Date(t.getFullYear(), t.getMonth(), t.getDate()), -wd(t));
+    $("start").value = iso(mon);
+    $("end").value = iso(addDays(mon, 18 * 7 - 1));
+    loadExample();
+    renderAll();
+
+    var drop = $("drop");
+    $("file").addEventListener("change", function (e) { handleFile(e.target.files[0]); e.target.value = ""; });
+    ["dragenter", "dragover"].forEach(function (n) { drop.addEventListener(n, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (n) { drop.addEventListener(n, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+    drop.addEventListener("drop", function (e) { var f = e.dataTransfer && e.dataTransfer.files[0]; handleFile(f); });
+
+    function onEdit(e) {
+      var tr = e.target.closest("tr[data-id]"); if (!tr || !e.target.dataset.f) return;
+      var m = state.meetings.find(function (x) { return x.id === +tr.dataset.id; }); if (!m) return;
+      var f = e.target.dataset.f; m[f] = f === "day" ? +e.target.value : e.target.value;
+      state.example = false;
+      refresh();
+      if (f === "code") { var cm = colorMap(); document.querySelectorAll("#rows tr[data-id]").forEach(function (r) { var mm = state.meetings.find(function (x) { return x.id === +r.dataset.id; }); if (mm) r.querySelector(".dot").style.background = cm[mm.code]; }); }
+    }
+    $("rows").addEventListener("input", onEdit);
+    $("rows").addEventListener("change", onEdit);
+    $("rows").addEventListener("click", function (e) {
+      if (!e.target.dataset.del) return;
+      var id = +e.target.closest("tr").dataset.id;
+      state.meetings = state.meetings.filter(function (m) { return m.id !== id; });
+      state.example = false; renderRows(); refresh();
+    });
+    $("add").addEventListener("click", function () {
+      state.meetings.push(mk("NEW 001", "New subject", "", 0, "08:00", "09:00")); state.example = false; renderRows(); refresh();
+      var ins = document.querySelectorAll("#rows tr[data-id] input.code"); if (ins.length) ins[ins.length - 1].focus();
+    });
+    $("vWeek").addEventListener("click", function () { state.view = "week"; renderCalendar(); });
+    $("vMonth").addEventListener("click", function () { state.view = "month"; renderCalendar(); });
+    $("cal").addEventListener("click", function (e) {
+      var n = e.target.closest("[data-nav]"); if (!n || !state.month) return;
+      var d = new Date(state.month.y, state.month.m + (+n.dataset.nav), 1); state.month = { y: d.getFullYear(), m: d.getMonth() }; renderCalendar();
+    });
+    ["start", "end", "skip", "alarm"].forEach(function (id) { $(id).addEventListener("input", function () { if (id === "start") { var s = parseIso($("start").value); if (s) state.month = { y: s.getFullYear(), m: s.getMonth() }; } refresh(); }); });
+    $("dl").addEventListener("click", saveIcs);
+    $("copy").addEventListener("click", copyIcs);
+
+    try {
+      if (window.claude && window.claude.use) window.claude.use("downloads").then(function (d) {
+        if (d) { $("dl").textContent = "Save calendar (.zip with .ics)"; $("exportHint").textContent = "The file is saved as a .zip that holds class-schedule.ics. Unzip it, then import the .ics in Google Calendar under Settings, then Import & export. Every class repeats weekly from the first day to the last day, skipping the no-class dates."; }
+      });
+    } catch (e) { /* plain browser */ }
+  }
+  init();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>
+</body>
+</html>
